@@ -7,15 +7,9 @@
 //**********************************************************************************
 // *** インクルードファイル ***
 //**********************************************************************************
-#include "ranking/rankingServer.h"
-#include "ranking/ranking.h"
+#include "server/rankingServer.h"
+#include "server/ranking.h"
 #include "network/tcp_client.h"
-#include <algorithm>
-#include <cstdint>
-#include <cstdio>
-#include <cstring>
-#include <iostream>
-#include <thread>
 
 //**********************************************************************************
 // *** 定数宣言 ***
@@ -70,17 +64,8 @@ HRESULT CRankingServer::Init(std::string_view path,
 //==================================================================================
 void CRankingServer::Uninit(void)
 {
-	if (m_pListener != nullptr)
-	{ // 接続受付の終了処理
-		m_pListener->Uninit();
-		m_pListener.reset();
-	}
-
-	if (m_pRanking != nullptr)
-	{ // ランキングの終了処理
-		m_pRanking->Uninit();
-		m_pRanking.reset();
-	}
+	SafeUniqueUninit(m_pListener);		// 接続受付の終了処理
+	SafeUniqueUninit(m_pRanking);		// ランキングの終了処理
 }
 
 //==================================================================================
@@ -134,13 +119,14 @@ void CRankingServer::ThreadProc(std::unique_ptr<CTcpClient> pClient)
 	}
 	else
 	{ // 1バイト目のコマンドで分岐
-		switch (static_cast<COMMAND_TYPE>(aRecvData[0]))
+		const COMMAND_TYPE command = EnumUtil::FromUnderlying<COMMAND_TYPE>(aRecvData[0]);		// 受け取ったコマンド
+		switch (IsValid(command) ? command : COMMAND_TYPE::NONE)
 		{
-		case COMMAND_TYPE_SET_RANKING:		// ランキングデータ設定
+		case COMMAND_TYPE::SET_RANKING:		// ランキングデータ設定
 			SetRanking(*pClient, &aRecvData[1], nRecvByteAll - 1);
 			break;
 
-		case COMMAND_TYPE_GET_RANKING:		// ランキングデータ取得
+		case COMMAND_TYPE::GET_RANKING:		// ランキングデータ取得
 			GetRanking(*pClient);
 			break;
 
@@ -172,7 +158,7 @@ void CRankingServer::SetRanking(CTcpClient &client, const char *pPayload, const 
 
 	// バイトデータをスコアに変換
 	uint32_t uScore = 0;
-	std::memcpy(&uScore, pPayload, sizeof(uScore));
+	memcpy(&uScore, pPayload, sizeof(uScore));
 	const int nScore = static_cast<int>(ntohl(uScore));
 
 	// スコア追加後順位取得

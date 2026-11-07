@@ -89,7 +89,11 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>core/pch.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>core/pch.h</ForcedIncludeFiles>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -104,7 +108,11 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>core/pch.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>core/pch.h</ForcedIncludeFiles>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -119,7 +127,10 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>core/pch.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>core/pch.h</ForcedIncludeFiles>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
@@ -135,7 +146,10 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>core/pch.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>core/pch.h</ForcedIncludeFiles>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
@@ -147,20 +161,26 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\app\main.cpp" />
+    <ClCompile Include="src\core\main.cpp" />
     <ClCompile Include="src\network\tcp_client.cpp" />
     <ClCompile Include="src\network\tcp_listener.cpp" />
-    <ClCompile Include="src\ranking\rankingServer.cpp" />
-    <ClCompile Include="src\utility\filestream.cpp" />
+    <ClCompile Include="src\server\rankingServer.cpp" />
+    <ClCompile Include="src\util\filestream.cpp" />
+    <ClCompile Include="src\core\pch.cpp">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\app\main.h" />
-    <ClInclude Include="src\network\tcp_client.h" />
-    <ClInclude Include="src\network\tcp_listener.h" />
-    <ClInclude Include="src\ranking\protocol_ranking.h" />
-    <ClInclude Include="src\ranking\ranking.h" />
-    <ClInclude Include="src\ranking\rankingServer.h" />
-    <ClInclude Include="src\utility\filestream.h" />
+    <ClInclude Include="include\core\main.h" />
+    <ClInclude Include="include\core\pch.h" />
+    <ClInclude Include="include\debug\memdbg.h" />
+    <ClInclude Include="include\network\protocol_ranking.h" />
+    <ClInclude Include="include\network\tcp_client.h" />
+    <ClInclude Include="include\network\tcp_listener.h" />
+    <ClInclude Include="include\server\ranking.h" />
+    <ClInclude Include="include\server\rankingServer.h" />
+    <ClInclude Include="include\util\enumUtil.h" />
+    <ClInclude Include="include\util\filestream.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

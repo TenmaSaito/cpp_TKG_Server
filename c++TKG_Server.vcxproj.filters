@@ -1,25 +1,43 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="src">
-      <UniqueIdentifier>{0B6F3C1A-6E2D-4C8B-9A51-1F7E2D3C4A01}</UniqueIdentifier>
+    <Filter Include="include">
+      <UniqueIdentifier>{7E1C2A40-3B5D-4F6E-9A8B-000000000001}</UniqueIdentifier>
     </Filter>
-    <Filter Include="src\app">
-      <UniqueIdentifier>{0B6F3C1A-6E2D-4C8B-9A51-1F7E2D3C4A02}</UniqueIdentifier>
+    <Filter Include="include\core">
+      <UniqueIdentifier>{7E1C2A40-3B5D-4F6E-9A8B-000000000002}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\debug">
+      <UniqueIdentifier>{7E1C2A40-3B5D-4F6E-9A8B-000000000003}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\network">
+      <UniqueIdentifier>{7E1C2A40-3B5D-4F6E-9A8B-000000000004}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\server">
+      <UniqueIdentifier>{7E1C2A40-3B5D-4F6E-9A8B-000000000005}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="include\util">
+      <UniqueIdentifier>{7E1C2A40-3B5D-4F6E-9A8B-000000000006}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src">
+      <UniqueIdentifier>{7E1C2A40-3B5D-4F6E-9A8B-000000000007}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\core">
+      <UniqueIdentifier>{7E1C2A40-3B5D-4F6E-9A8B-000000000008}</UniqueIdentifier>
     </Filter>
     <Filter Include="src\network">
-      <UniqueIdentifier>{0B6F3C1A-6E2D-4C8B-9A51-1F7E2D3C4A03}</UniqueIdentifier>
+      <UniqueIdentifier>{7E1C2A40-3B5D-4F6E-9A8B-000000000009}</UniqueIdentifier>
     </Filter>
-    <Filter Include="src\ranking">
-      <UniqueIdentifier>{0B6F3C1A-6E2D-4C8B-9A51-1F7E2D3C4A04}</UniqueIdentifier>
+    <Filter Include="src\server">
+      <UniqueIdentifier>{7E1C2A40-3B5D-4F6E-9A8B-00000000000A}</UniqueIdentifier>
     </Filter>
-    <Filter Include="src\utility">
-      <UniqueIdentifier>{0B6F3C1A-6E2D-4C8B-9A51-1F7E2D3C4A05}</UniqueIdentifier>
+    <Filter Include="src\util">
+      <UniqueIdentifier>{7E1C2A40-3B5D-4F6E-9A8B-00000000000B}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\app\main.cpp">
-      <Filter>src\app</Filter>
+    <ClCompile Include="src\core\main.cpp">
+      <Filter>src\core</Filter>
     </ClCompile>
     <ClCompile Include="src\network\tcp_client.cpp">
       <Filter>src\network</Filter>
@@ -27,34 +45,46 @@
     <ClCompile Include="src\network\tcp_listener.cpp">
       <Filter>src\network</Filter>
     </ClCompile>
-    <ClCompile Include="src\ranking\rankingServer.cpp">
-      <Filter>src\ranking</Filter>
+    <ClCompile Include="src\server\rankingServer.cpp">
+      <Filter>src\server</Filter>
     </ClCompile>
-    <ClCompile Include="src\utility\filestream.cpp">
-      <Filter>src\utility</Filter>
+    <ClCompile Include="src\util\filestream.cpp">
+      <Filter>src\util</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\pch.cpp">
+      <Filter>src\core</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\app\main.h">
-      <Filter>src\app</Filter>
+    <ClInclude Include="include\core\main.h">
+      <Filter>include\core</Filter>
     </ClInclude>
-    <ClInclude Include="src\network\tcp_client.h">
-      <Filter>src\network</Filter>
+    <ClInclude Include="include\core\pch.h">
+      <Filter>include\core</Filter>
     </ClInclude>
-    <ClInclude Include="src\network\tcp_listener.h">
-      <Filter>src\network</Filter>
+    <ClInclude Include="include\debug\memdbg.h">
+      <Filter>include\debug</Filter>
     </ClInclude>
-    <ClInclude Include="src\ranking\protocol_ranking.h">
-      <Filter>src\ranking</Filter>
+    <ClInclude Include="include\network\protocol_ranking.h">
+      <Filter>include\network</Filter>
     </ClInclude>
-    <ClInclude Include="src\ranking\ranking.h">
-      <Filter>src\ranking</Filter>
+    <ClInclude Include="include\network\tcp_client.h">
+      <Filter>include\network</Filter>
     </ClInclude>
-    <ClInclude Include="src\ranking\rankingServer.h">
-      <Filter>src\ranking</Filter>
+    <ClInclude Include="include\network\tcp_listener.h">
+      <Filter>include\network</Filter>
     </ClInclude>
-    <ClInclude Include="src\utility\filestream.h">
-      <Filter>src\utility</Filter>
+    <ClInclude Include="include\server\ranking.h">
+      <Filter>include\server</Filter>
+    </ClInclude>
+    <ClInclude Include="include\server\rankingServer.h">
+      <Filter>include\server</Filter>
+    </ClInclude>
+    <ClInclude Include="include\util\enumUtil.h">
+      <Filter>include\util</Filter>
+    </ClInclude>
+    <ClInclude Include="include\util\filestream.h">
+      <Filter>include\util</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

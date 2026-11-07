@@ -10,14 +10,8 @@
 //**********************************************************************************
 // *** インクルードファイル ***
 //**********************************************************************************
-#include <array>
-#include <string>
-#include <string_view>
-#include <algorithm>
-#include <functional>
-#include <mutex>
-#include "app/main.h"
-#include "utility/filestream.h"
+#include "core/main.h"
+#include "util/filestream.h"
 
 //**********************************************************************************
 // *** ランキングクラス (スレッドセーフ) ***
@@ -116,7 +110,7 @@ template<typename T, size_t MAX_NUM, bool IS_ASCENDING>
 bool CRanking<T, MAX_NUM, IS_ASCENDING>::Save(void) const
 {
 	CFileStream file;
-	if (file.Create(m_sRankingPath, true, CFileStream::FLAG_OVERWRITE) == false) return false;
+	if (file.Create(m_sRankingPath, true, CFileStream::FLAG::OVERWRITE) == false) return false;
 
 	return file.Write(m_aScore.data(), sizeof(T) * m_aScore.size());
 }

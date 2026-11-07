@@ -10,10 +10,8 @@
 //**********************************************************************************
 // *** インクルードファイル ***
 //**********************************************************************************
-#include <memory>
-#include <string_view>
-#include "app/main.h"
-#include "ranking/protocol_ranking.h"
+#include "core/main.h"
+#include "network/protocol_ranking.h"
 #include "network/tcp_listener.h"
 
 //**********************************************************************************

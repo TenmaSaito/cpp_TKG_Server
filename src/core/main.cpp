@@ -7,10 +7,8 @@
 //**********************************************************************************
 // *** インクルードファイル ***
 //**********************************************************************************
-#include "app/main.h"
-#include "ranking/rankingServer.h"
-#include <cstdio>
-#include <cstdlib>
+#include "core/main.h"
+#include "server/rankingServer.h"
 
 //**********************************************************************************
 // *** 定数宣言 ***
@@ -33,6 +31,11 @@ void WaitEnter(void);
 //==================================================================================
 int main(void)
 {
+#ifdef _DEBUG
+	// メモリリーク検知用のフラグを立てる
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+#endif
+
 	// WinSockの初期化処理
 	WSADATA wsaData = {};
 	printf("Winsockの初期化を開始...\n");

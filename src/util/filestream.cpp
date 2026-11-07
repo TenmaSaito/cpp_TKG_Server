@@ -7,19 +7,14 @@
 //**********************************************************************************
 // *** インクルードファイル ***
 //**********************************************************************************
-#include "utility/filestream.h"
+#include "util/filestream.h"
 #include <filesystem>
-
-//==================================================================================
-// --- コンストラクタ ---
-//==================================================================================
-CFileStream::CFileStream() noexcept = default;
 
 //==================================================================================
 // --- ファイルオープンコンストラクタ ---
 //==================================================================================
 CFileStream::CFileStream(std::string_view sFilename, const bool bBinary)
-{ // ファイルオープン
+{// ファイルオープン
 	Open(sFilename, bBinary);
 }
 
@@ -27,7 +22,7 @@ CFileStream::CFileStream(std::string_view sFilename, const bool bBinary)
 // --- ファイル作成コンストラクタ ---
 //==================================================================================
 CFileStream::CFileStream(std::string_view sFilename, const bool bBinary, const FLAG flag)
-{ // ファイル作成
+{// ファイル作成
 	Create(sFilename, bBinary, flag);
 }
 
@@ -96,12 +91,12 @@ bool CFileStream::Create(std::string_view sFilename, const bool bBinary, const F
 	// FLAGによってmodeにフラグを追加
 	switch (flag)
 	{
-	case FLAG_OVERWRITE:		// 上書きの場合
+	case FLAG::OVERWRITE:		// 上書きの場合
 		// 上書きフラグ追加
 		mode |= std::ios::trunc;
 		break;
 
-	case FLAG_CONTINUE:			// 追記の場合
+	case FLAG::CONTINUE:			// 追記の場合
 		if (std::filesystem::exists(sFilename))
 		{ // ファイルが開けた場合(ファイルが存在する場合)
 			// ファイルサイズを取得
@@ -112,7 +107,7 @@ bool CFileStream::Create(std::string_view sFilename, const bool bBinary, const F
 		mode |= std::ios::app;
 		break;
 
-	case FLAG_CANCEL:			// 取り消しの場合
+	case FLAG::CANCEL:			// 取り消しの場合
 		// 一度ファイルを入力ストリームで開いて、存在するか確認
 		if (std::filesystem::exists(sFilename))
 		{ // ファイルが開けた場合(ファイルが存在する場合)

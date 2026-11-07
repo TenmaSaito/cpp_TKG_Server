@@ -12,14 +12,15 @@
 // *** インクルードファイル ***
 //**********************************************************************************
 #include <iostream>
+#include "util/enumUtil.h"
 #include <fstream>
 #include <string>
 #include <string_view>
 #include <format>
 #include <functional>
-#include <cassert>
-#include <cstdint>
-#include <cstdlib>
+
+#pragma push_macro("CreateFile")
+#undef CreateFile
 
 //**********************************************************************************
 // *** ファイル入出力クラス ***
@@ -28,15 +29,21 @@ class CFileStream
 {
 public:
 	// 書き出し時、ファイルが存在した場合のフラグの種類
-	typedef enum
+	enum class FLAG
 	{
-		FLAG_OVERWRITE = 0,		// ファイルを初期化し上書き
-		FLAG_CONTINUE,			// ファイルの続きから記入
-		FLAG_CANCEL,			// 処理を取り消し
-		FLAG_MAX
-	} FLAG;
+		OVERWRITE = 0,		// ファイルを初期化し上書き
+		CONTINUE,			// ファイルの続きから記入
+		CANCEL,			// 処理を取り消し
+		MAX
+	};
 
-	CFileStream() noexcept;
+	// 有効値かどうかの判定
+	static constexpr bool IsValid(const FLAG value) noexcept
+	{
+		return EnumUtil::InRange(value, FLAG::OVERWRITE, FLAG::MAX);
+	}
+
+	CFileStream() noexcept = default;
 	CFileStream(std::string_view sFilename, const bool bBinary);
 	CFileStream(std::string_view sFilename, const bool bBinary, const FLAG flag);
 	CFileStream(const CFileStream &file) = delete;
@@ -94,9 +101,9 @@ private:
 	std::ifstream m_Infile;		// ファイル入力ストリーム
 	std::ofstream m_Outfile;	// ファイル出力ストリーム
 	std::string m_filename;		// 開いているファイル名
-	uintmax_t m_size = 0;			// ファイルのサイズ
-	bool m_bBinary = false;				// バイナリかどうか
-	bool m_bInStream = false;			// ファイル入力かどうか
+	uintmax_t m_size = 0U;		// ファイルのサイズ
+	bool m_bBinary = false;		// バイナリかどうか
+	bool m_bInStream = false;	// ファイル入力かどうか
 };
 
 //==================================================================================
@@ -217,6 +224,7 @@ template<class T> bool CFileStream::Read(T *pData, const size_t size)
 	// nullチェック
 	if (pData == nullptr)
 	{ // nullならアサーション
+		assert(pData != nullptr);
 		return false;
 	}
 
@@ -361,6 +369,7 @@ template<class T> bool CFileStream::Write(const T *pData, const size_t size)
 	// nullチェック
 	if (pData == nullptr)
 	{ // nullならアサーション
+		assert(pData != nullptr);
 		return false;
 	}
 
@@ -439,4 +448,6 @@ template<class T, size_t num> CFileStream& CFileStream::operator>>(T (&data)[num
 	// 連続抽出用に自身を返す
 	return *this;
 }
+
+#pragma pop_macro("CreateFile")
 #endif // !_FILESTREAM_H_
