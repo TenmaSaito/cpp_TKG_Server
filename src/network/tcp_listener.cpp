@@ -1,8 +1,8 @@
 //==================================================================================
-// 
+//
 // TCP接続受付クラスのソースファイル [tcp_listener.cpp]
 // Author : TENMA SAITO
-// 
+//
 //==================================================================================
 //**********************************************************************************
 // *** インクルードファイル ***
@@ -11,45 +11,33 @@
 #include "network/tcp_client.h"
 
 //==================================================================================
-// --- コンストラクタ ---
-//==================================================================================
-CTcpListener::CTcpListener()
-{
-}
-
-//==================================================================================
-// --- デストラクタ ---
-//==================================================================================
-CTcpListener::~CTcpListener()
-{
-}
-
-//==================================================================================
 // --- 初期化処理 ---
 //==================================================================================
-bool CTcpListener::Init(u_short nPortID, int nMaxStay)
+bool CTcpListener::Init(const u_short nPortID, const int nMaxStay)
 {
+	// 既に持っているソケットは閉じる
+	Uninit();
+
 	// ソケット作成
 	m_sockServer = socket(AF_INET, SOCK_STREAM, 0);
-	if (m_sockServer == INVALID_SOCKET)
-	{ // ソケット作成失敗
-		return false;
-	}
+	if (m_sockServer == INVALID_SOCKET) return false;		// ソケット作成失敗
 
-	// 接続受付の準備
-	struct sockaddr_in addr;
-
+	// 接続を受け付けるアドレスとポート番号を指定
+	struct sockaddr_in addr = {};
 	addr.sin_family = AF_INET;
-
-	// 接続を受け付けるポート番号を指定
 	addr.sin_port = htons(nPortID);
 	addr.sin_addr.S_un.S_addr = INADDR_ANY;
 
-	// ソケットにポートを割り当てる
-	bind(m_sockServer, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr));
+	// ソケットにポートを割り当て、接続受付の準備をする (第二引数に最大何人待機できるか)
+	if (bind(m_sockServer, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr)) == SOCKET_ERROR
+		|| listen(m_sockServer, nMaxStay) == SOCKET_ERROR)
+	{ // 失敗した場合はソケットを閉じる (エラーコードは呼び出し側でWSAGetLastErrorから取得)
+		const int nError = WSAGetLastError();
+		Uninit();
+		WSASetLastError(nError);
+		return false;
+	}
 
-	// 接続受付の準備をする (第二引数に最大何人待機できるか)
-	listen(m_sockServer, nMaxStay);
 	return true;
 }
 
@@ -58,105 +46,49 @@ bool CTcpListener::Init(u_short nPortID, int nMaxStay)
 //==================================================================================
 void CTcpListener::Uninit(void)
 {
-	if (m_sockServer != INVALID_SOCKET)
-	{ // ソケットが有効なら
-		// ソケットを閉じて無効化
-		closesocket(m_sockServer);
-		m_sockServer = INVALID_SOCKET;
-	}
+	if (m_sockServer == INVALID_SOCKET) return;		// 既に無効
+
+	closesocket(m_sockServer);
+	m_sockServer = INVALID_SOCKET;
 }
 
 //==================================================================================
-// --- 接続待ち受け処理 ---
+// --- 接続待ち受け処理 (接続されるまで待機) ---
 //==================================================================================
-CTcpClient *CTcpListener::Accept(void)
+std::unique_ptr<CTcpClient> CTcpListener::Accept(void)
 {
-	if (m_sockServer == INVALID_SOCKET)
-	{ // 接続待ち受け失敗
-		return nullptr;
-	}
-
-	// 接続待機
-	struct sockaddr_in clientAddr;
-	int nLength = sizeof(clientAddr);	
-	SOCKET sock = INVALID_SOCKET;		// 接続用ソケット
-	CTcpClient *pClient = nullptr;		// 送受信クラスへのポインタ
-
-	// クライアントから接続されるまで待機
-	sock = accept(m_sockServer, reinterpret_cast<struct sockaddr*>(&clientAddr), &nLength);
-
-	// 接続成功時
-	if (sock != INVALID_SOCKET)
-	{
-		// 送受信クラスを生成
-		pClient = new CTcpClient;
-		if (pClient == nullptr)
-		{ // 生成失敗
-			return nullptr;
-		}
-
-		// ソケットとクライアントの情報を割り当て
-		pClient->Init(sock, clientAddr);
-	}
-
-	// 生成されていれば、送受信クラスへのポインタを返す
-	return pClient;
+	return Accept(TIMEOUT_INFINITY, 0);
 }
 
 //==================================================================================
 // --- 接続待ち受け処理 (タイムアウトあり) ---
+// lSeconds に TIMEOUT_INFINITY を指定すると無限待機
 //==================================================================================
-CTcpClient* CTcpListener::Accept(const long lSeconds,
-	const long lUsec)
+std::unique_ptr<CTcpClient> CTcpListener::Accept(const long lSeconds, const long lUsec)
 {
-	if (m_sockServer == INVALID_SOCKET)
-	{ // 接続待ち受け失敗
-		return nullptr;
-	}
-
-	// タイムアウト設定関連変数
-	timeval timeout;				// タイムアウト用変数
-	fd_set fd_Wait;					// ソケット登録用変数
-	timeval *pTimeout = nullptr;	// 条件分岐用ポインタ
-	timeout.tv_sec = lSeconds;		// タイムアウト時間を設定
-	timeout.tv_usec = lUsec;		// ミリ秒指定
+	if (m_sockServer == INVALID_SOCKET) return nullptr;		// 接続受付の準備ができていない
 
 	// ソケットとfd_set変数を紐づけ
-	FD_ZERO(&fd_Wait);
-	FD_SET(m_sockServer, &fd_Wait);
+	fd_set fdWait;
+	FD_ZERO(&fdWait);
+	FD_SET(m_sockServer, &fdWait);
+
+	timeval timeout = { lSeconds, lUsec };		// タイムアウト時間
 
 	// 無限待機の場合、selectの第5引数をnullに指定する
-	pTimeout = (lSeconds == TIMEOUT_INFINITY) ? nullptr : &timeout;
+	timeval *pTimeout = (lSeconds == TIMEOUT_INFINITY) ? nullptr : &timeout;
 
-	// 指定時間まで接続待機
-	if (select(m_sockServer + 1, &fd_Wait, NULL, NULL, pTimeout) <= 0)
-	{ // 指定時間経過後、接続しなかった場合タイムアウトの為失敗
-		return nullptr;
-	}
+	// 指定時間まで接続待機 (Windowsではselectの第1引数は無視される)
+	if (select(0, &fdWait, nullptr, nullptr, pTimeout) <= 0) return nullptr;		// タイムアウト
 
-	// 接続待機
-	struct sockaddr_in clientAddr;
+	// 接続を受け付ける
+	struct sockaddr_in clientAddr = {};
 	int nLength = sizeof(clientAddr);
-	SOCKET sock = INVALID_SOCKET;		// 接続用ソケット
-	CTcpClient *pClient = nullptr;		// 送受信クラスへのポインタ
+	const SOCKET sock = accept(m_sockServer, reinterpret_cast<struct sockaddr *>(&clientAddr), &nLength);
+	if (sock == INVALID_SOCKET) return nullptr;		// 接続失敗
 
-	// クライアントから接続されるまで待機
-	sock = accept(m_sockServer, reinterpret_cast<struct sockaddr*>(&clientAddr), &nLength);
-
-	// 接続成功時
-	if (sock != INVALID_SOCKET)
-	{
-		// 送受信クラスを生成
-		pClient = new CTcpClient;
-		if (pClient == nullptr)
-		{ // 生成失敗
-			return nullptr;
-		}
-
-		// ソケットとクライアントの情報を割り当て
-		pClient->Init(sock, clientAddr);
-	}
-
-	// 生成されていれば、送受信クラスへのポインタを返す
+	// 送受信クラスを生成し、ソケットとクライアントの情報を割り当て
+	auto pClient = std::make_unique<CTcpClient>();
+	pClient->Init(sock, clientAddr);
 	return pClient;
 }

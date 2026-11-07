@@ -1,38 +1,25 @@
 //==================================================================================
-// 
+//
 // TCP送受信クラスのソースファイル [tcp_client.cpp]
 // Author : TENMA SAITO
-// 
+//
 //==================================================================================
 //**********************************************************************************
 // *** インクルードファイル ***
 //**********************************************************************************
 #include "network/tcp_client.h"
+#include <WS2tcpip.h>
 
 //==================================================================================
-// --- コンストラクタ ---
-//==================================================================================
-CTcpClient::CTcpClient()
-{
-}
-
-//==================================================================================
-// --- デストラクタ ---
-//==================================================================================
-CTcpClient::~CTcpClient()
-{
-}
-
-//==================================================================================
-// --- 初期化処理 ---
+// --- 初期化処理 (接続済みソケットを割り当て) ---
 //==================================================================================
 void CTcpClient::Init(const SOCKET sock, const struct sockaddr_in &client)
 {
-	// ソケットを保存
-	m_sock = sock;
+	// 既に持っているソケットは閉じる
+	CloseSocket();
 
-	// クライアントの情報を保存
-	m_addr = client;
+	m_sock = sock;		// ソケットを保存
+	m_addr = client;	// クライアントの情報を保存
 }
 
 //==================================================================================
@@ -40,52 +27,48 @@ void CTcpClient::Init(const SOCKET sock, const struct sockaddr_in &client)
 //==================================================================================
 int CTcpClient::Init(const char *pIPAddress, const u_short nPortID)
 {
-	if (pIPAddress == NULL)
-	{ // IPアドレスがNULLなら失敗
-		return CLIENT_E_INVALID_POINTER;
+	if (pIPAddress == nullptr) return CLIENT_E_INVALID_POINTER;		// IPアドレスがNULL
+
+	// 既に持っているソケットは閉じる
+	CloseSocket();
+
+	// 接続先を設定
+	struct sockaddr_in addr = {};
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(nPortID);
+	if (inet_pton(AF_INET, pIPAddress, &addr.sin_addr) != 1)
+	{ // IPアドレスの変換に失敗
+		return CLIENT_E_INVALID_ARG;
 	}
 
 	// 通信用のソケットを作成
 	m_sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (m_sock == INVALID_SOCKET)
-	{ // ソケット作成失敗
-		return CLIENT_E_INVALID_SOCKET;
-	}
-
-	// 接続先を指定する構造体
-	struct sockaddr_in addr;
-
-	// 接続受付の準備
-	addr.sin_family = AF_INET;
-
-	// 接続を受け付けるポート番号を指定
-	addr.sin_port = htons(nPortID);
-
-	// 文字列からIPアドレスを取得
-	addr.sin_addr.S_un.S_addr = inet_addr(&pIPAddress[0]);
+	if (m_sock == INVALID_SOCKET) return CLIENT_E_INVALID_SOCKET;	// ソケット作成失敗
 
 	// サーバーに接続する！
-	if (connect(m_sock, (struct sockaddr*)&addr, sizeof(addr)) != 0)
-	{ // 接続失敗時
-		// ソケットを閉じる
+	if (connect(m_sock, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr)) != 0)
+	{ // 接続失敗時、ソケットを閉じる
 		CloseSocket();
-
 		return CLIENT_E_CONNECTION;
 	}
 
-	// 自身の情報を保存
-	memcpy(&m_addr, &addr, sizeof(addr));
-
-	// 初期化成功
+	// 接続先の情報を保存
+	m_addr = addr;
 	return CLIENT_S_FUNCTION;
 }
 
 //==================================================================================
-// --- 終了処理 ---
+// --- 接続先IPアドレスの文字列取得処理 (スレッドセーフ) ---
 //==================================================================================
-void CTcpClient::Uninit(void)
-{ // ソケットを閉じる
-	CloseSocket();
+std::string CTcpClient::GetClientIP(void) const
+{
+	char aIP[INET_ADDRSTRLEN] = {};		// IPアドレスの文字列
+	if (inet_ntop(AF_INET, &m_addr.sin_addr, aIP, sizeof(aIP)) == nullptr)
+	{ // 変換失敗
+		return "unknown";
+	}
+
+	return aIP;
 }
 
 //==================================================================================
@@ -93,15 +76,27 @@ void CTcpClient::Uninit(void)
 //==================================================================================
 void CTcpClient::CloseSocket(void)
 {
-	if (m_sock != INVALID_SOCKET)
-	{ // ソケットが無効でなければ
-		// ソケットを閉じる
-		closesocket(m_sock);
+	if (m_sock == INVALID_SOCKET) return;		// 既に無効
 
-		// ソケットを無効にする
-		m_sock = INVALID_SOCKET;
-		
-		// クライアントの情報のクリア
-		memset(&m_addr, 0, sizeof(m_addr));
-	}
+	closesocket(m_sock);
+	m_sock = INVALID_SOCKET;
+	m_addr = {};
+}
+
+//==================================================================================
+// --- 受信可能になるまで待機する処理 ---
+//==================================================================================
+bool CTcpClient::WaitReadable(const long lSeconds, const long lUsec) const
+{
+	fd_set fdWait;		// ソケット登録用変数
+	FD_ZERO(&fdWait);
+	FD_SET(m_sock, &fdWait);
+
+	timeval timeout = { lSeconds, lUsec };		// タイムアウト時間
+
+	// 無限待機の場合、selectの第5引数をnullに指定する
+	timeval *pTimeout = (lSeconds == RECV_INFINITY) ? nullptr : &timeout;
+
+	// Windowsではselectの第1引数は無視される
+	return select(0, &fdWait, nullptr, nullptr, pTimeout) > 0;
 }

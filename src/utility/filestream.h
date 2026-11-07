@@ -1,6 +1,6 @@
 //==================================================================================
 //
-// ファイル入出力クラス！ [fliestream.h]
+// ファイル入出力クラス！ [filestream.h]
 // Author : TENMA SAITO
 // DATE : 2026/04/28
 //
@@ -17,6 +17,9 @@
 #include <string_view>
 #include <format>
 #include <functional>
+#include <cassert>
+#include <cstdint>
+#include <cstdlib>
 
 //**********************************************************************************
 // *** ファイル入出力クラス ***
@@ -37,7 +40,7 @@ public:
 	CFileStream(std::string_view sFilename, const bool bBinary);
 	CFileStream(std::string_view sFilename, const bool bBinary, const FLAG flag);
 	CFileStream(const CFileStream &file) = delete;
-	CFileStream(CFileStream &&other) noexcept;
+	CFileStream(CFileStream &&other) noexcept = default;
 	~CFileStream();
 
 	bool Open(std::string_view sFilename, const bool bBinary);
@@ -69,12 +72,12 @@ public:
 	template<class T> bool Write(const T *pData, const size_t size);
 	bool WriteByFunc(std::function<void(std::ofstream&)> writeFunc);
 	bool WriteString(const std::string_view &string);
-	template<class... Args> static std::string ToString(std::_Fmt_string<Args...> fmt, Args... args);
+	template<class... Args> static std::string ToString(std::_Fmt_string<Args...> fmt, Args&&... args);
 
 	CFileStream &operator=(const CFileStream &file) = delete;
-	CFileStream &operator=(CFileStream &&other) noexcept;
-	template<class T> const CFileStream &operator >> (T &data);
-	template<class T, size_t num> const CFileStream &operator >> (T (&data)[num]);
+	CFileStream &operator=(CFileStream &&other) noexcept = default;
+	template<class T> CFileStream &operator >> (T &data);
+	template<class T, size_t num> CFileStream &operator >> (T (&data)[num]);
 	template<class T> CFileStream &operator << (const T &data);
 	template<class T, size_t num> CFileStream &operator << (const T (&data)[num]);
 	operator bool(void) const;
@@ -91,9 +94,9 @@ private:
 	std::ifstream m_Infile;		// ファイル入力ストリーム
 	std::ofstream m_Outfile;	// ファイル出力ストリーム
 	std::string m_filename;		// 開いているファイル名
-	uintmax_t m_size;			// ファイルのサイズ
-	bool m_bBinary;				// バイナリかどうか
-	bool m_bInStream;			// ファイル入力かどうか
+	uintmax_t m_size = 0;			// ファイルのサイズ
+	bool m_bBinary = false;				// バイナリかどうか
+	bool m_bInStream = false;			// ファイル入力かどうか
 };
 
 //==================================================================================
@@ -384,7 +387,7 @@ template<class T> bool CFileStream::Write(const T *pData, const size_t size)
 //==================================================================================
 // --- 文字列化のヘルパー関数 ---
 //==================================================================================
-template<class... Args> static std::string CFileStream::ToString(std::_Fmt_string<Args...> fmt, Args... args)
+template<class... Args> std::string CFileStream::ToString(std::_Fmt_string<Args...> fmt, Args&&... args)
 {
 	return std::format(fmt, std::forward<Args>(args)...);
 }
@@ -416,7 +419,7 @@ template<class T, size_t num> CFileStream& CFileStream::operator<<(const T (&dat
 //==================================================================================
 // --- 演算子のオーバーロード (抽出) ---
 //==================================================================================
-template<class T> const CFileStream &CFileStream::operator>>(T &data)
+template<class T> CFileStream &CFileStream::operator>>(T &data)
 {
 	// 読み込み処理を行う
 	Read(data);
@@ -428,7 +431,7 @@ template<class T> const CFileStream &CFileStream::operator>>(T &data)
 //==================================================================================
 // --- 演算子のオーバーロード (配列抽出) ---
 //==================================================================================
-template<class T, size_t num> const CFileStream& CFileStream::operator>>(T (&data)[num])
+template<class T, size_t num> CFileStream& CFileStream::operator>>(T (&data)[num])
 {
 	// 読み込み処理を行う
 	Read(data, num);

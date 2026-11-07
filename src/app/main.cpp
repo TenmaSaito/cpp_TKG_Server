@@ -1,28 +1,32 @@
 //==================================================================================
-// 
+//
 // メイン関数 [main.cpp]
 // Author : TENMA SAITO
-// 
+//
 //==================================================================================
 //**********************************************************************************
 // *** インクルードファイル ***
 //**********************************************************************************
 #include "app/main.h"
 #include "ranking/rankingServer.h"
-#include <memory>
+#include <cstdio>
+#include <cstdlib>
 
 //**********************************************************************************
 // *** 定数宣言 ***
 //**********************************************************************************
 namespace
 {
-
+	constexpr const char *RANKING_FILE_PATH = "data/bin/ranking.bin";	// ランキングデータの保存先
+	constexpr u_short SERVER_PORT = 22333;								// 接続を受け付けるポート番号
+	constexpr int MAX_STAY = 5;											// 接続待ちできる最大数
 }
 
 //**********************************************************************************
 // *** プロトタイプ宣言 ***
 //**********************************************************************************
-void ServerFunction(void);
+void RunServer(void);
+void WaitEnter(void);
 
 //==================================================================================
 // --- メイン関数 ---
@@ -32,59 +36,53 @@ int main(void)
 	// WinSockの初期化処理
 	WSADATA wsaData = {};
 	printf("Winsockの初期化を開始...\n");
-	int nError = WSAStartup(WINSOCK_VERSION, &wsaData);
-	if (nError != 0)
-	{ // エラー出力の場合
-		// 入力待機後、プログラムを終了
+	if (WSAStartup(WINSOCK_VERSION, &wsaData) != 0)
+	{ // 初期化失敗時、入力待機後プログラムを終了
 		printf("WinSockの初期化に失敗！プログラムを終了します！\n");
-		rewind(stdin);
-		(void)getchar();
-
-		return 0;
+		WaitEnter();
+		return EXIT_FAILURE;
 	}
 
 	// サーバー関連処理
-	ServerFunction();
+	RunServer();
 
 	// WinSockの終了処理
 	WSACleanup();
 
 	// 入力待機
 	printf("*** Enterを押して終了! ***\n");
-	rewind(stdin);
-	(void)getchar();
-	return 0;
+	WaitEnter();
+	return EXIT_SUCCESS;
 }
 
 //==================================================================================
 // --- サーバーのメイン処理 ---
 //==================================================================================
-void ServerFunction(void)
-{ // サーバー作成
-	printf("サーバー作成中...\n");
-	std::unique_ptr pServer = std::make_unique<CRankingServer>();		// サーバー
-	if (pServer == nullptr)
-	{ // サーバー作成失敗
-		printf("サーバー作成に失敗！\n");
-		return;
-	}
+void RunServer(void)
+{
+	CRankingServer server;		// ランキングサーバー
 
 	// サーバー初期化
 	printf("サーバー初期化中...\n");
-	if (FAILED(pServer->Init("data/bin/ranking.bin", 22333, 5)))
+	if (FAILED(server.Init(RANKING_FILE_PATH, SERVER_PORT, MAX_STAY)))
 	{ // サーバー初期化失敗
 		printf("サーバー初期化に失敗！\n");
 		return;
 	}
 
-	// サーバーの動作開始
+	// サーバーの動作開始 (接続を待ち続ける)
 	printf("サーバー動作中...\n");
-	while (1)
-	{ // サーバーを更新
-		pServer->Update();
+	while (true)
+	{
+		server.Update();
 	}
+}
 
-	// サーバーを終了
-	printf("サーバー終了中...\n");
-	pServer->Uninit();
+//==================================================================================
+// --- Enter入力待機処理 ---
+//==================================================================================
+void WaitEnter(void)
+{
+	rewind(stdin);
+	(void)getchar();
 }

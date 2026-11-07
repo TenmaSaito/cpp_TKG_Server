@@ -1,8 +1,8 @@
 //==================================================================================
-// 
+//
 // TCP送受信クラスのヘッダーファイル [tcp_client.h]
 // Author : TENMA SAITO
-// 
+//
 //==================================================================================
 #ifndef _TCP_CLIENT_H_
 #define _TCP_CLIENT_H_
@@ -11,12 +11,13 @@
 // *** インクルードファイル ***
 //**********************************************************************************
 #include "app/main.h"
+#include <string>
 
 //**********************************************************************************
 // *** マクロ定義 ***
 //**********************************************************************************
-#define CLIENT_TCP_SUCCESS(code)	(code >= CLIENT_S_FUNCTION)		// 処理の成功判定マクロ
-#define CLIENT_TCP_FAILED(code)		(code < CLIENT_S_FUNCTION)		// 処理の失敗判定マクロ
+#define CLIENT_TCP_SUCCESS(code)	((code) >= CLIENT_S_FUNCTION)		// 処理の成功判定マクロ
+#define CLIENT_TCP_FAILED(code)		((code) < CLIENT_S_FUNCTION)		// 処理の失敗判定マクロ
 
 //**********************************************************************************
 // *** 定数宣言 ***
@@ -36,21 +37,25 @@ constexpr int RECV_INFINITY = -1;				// 無限待機
 class CTcpClient
 {
 public:
-	CTcpClient();
-	~CTcpClient();
+	CTcpClient() = default;
+	~CTcpClient() { CloseSocket(); }
+	CTcpClient(const CTcpClient &) = delete;				// ソケットの二重解放防止の為コピー禁止
+	CTcpClient &operator=(const CTcpClient &) = delete;
 
 	void Init(const SOCKET sock, const struct sockaddr_in &client);
 	int Init(const char *pIPAddress, const u_short nPortID);
-	void Uninit(void);
+	void Uninit(void) { CloseSocket(); }
 	struct sockaddr_in GetClientAddr(void) const { return m_addr; }
-	template<class T> int Send(const T *pData, const int num);
-	template<class T> int SendWithSize(const T *pData, const int num);
-	template<class T> int Recv(T *pOut, const int num);
-	template<class T> int RecvAll(T *pOut, const int num);
-	template<class T> int Recv(T *pOut, const int num, const long nSeconds, const long nMill = 0);
+	std::string GetClientIP(void) const;
+	template<class T> int Send(const T *pData, const int nNum);
+	template<class T> int SendWithSize(const T *pData, const int nNum);
+	template<class T> int Recv(T *pOut, const int nNum);
+	template<class T> int RecvAll(T *pOut, const int nNum);
+	template<class T> int Recv(T *pOut, const int nNum, const long lSeconds, const long lUsec = 0);
 
 private:
 	void CloseSocket(void);
+	bool WaitReadable(const long lSeconds, const long lUsec) const;
 
 	SOCKET m_sock = INVALID_SOCKET;		// 通信用ソケット
 	struct sockaddr_in m_addr = {};		// クライアントの情報
@@ -58,96 +63,85 @@ private:
 
 //==================================================================================
 // --- データ送信処理 (エンディアン変換は外部で行う) ---
+// 指定バイト数を全て送り切るまで送信を繰り返す
 //==================================================================================
-template<class T> int CTcpClient::Send(const T *pData, const int num)
+template<class T> int CTcpClient::Send(const T *pData, const int nNum)
 {
-	if (m_sock == INVALID_SOCKET)
-	{ // ソケットが無効なら失敗
-		return CLIENT_E_INVALID_SOCKET;
-	}
-	else if (pData == NULL)
-	{ // データの読み取り元がNULLなら失敗
-		return CLIENT_E_INVALID_POINTER;
-	}
-	else if (num <= 0)
-	{ // 配列が0以下の場合失敗
-		return CLIENT_E_INVALID_ARG;
+	if (m_sock == INVALID_SOCKET) return CLIENT_E_INVALID_SOCKET;		// ソケットが無効
+	if (pData == nullptr) return CLIENT_E_INVALID_POINTER;				// 読み取り元がNULL
+	if (nNum <= 0) return CLIENT_E_INVALID_ARG;							// 配列数が0以下
+
+	const int nByte = static_cast<int>(sizeof(T)) * nNum;			// 処理するバイト数
+	const char *pByte = reinterpret_cast<const char *>(pData);		// 送信元のバイト列
+	int nTotal = 0;													// 送信済みのバイト数
+
+	while (nTotal < nByte)
+	{ // 全て送信するまで繰り返す
+		const int nSentByte = send(m_sock, &pByte[nTotal], nByte - nTotal, 0);
+		if (nSentByte == SOCKET_ERROR) return CLIENT_E_CONNECTION;		// 送信失敗
+
+		nTotal += nSentByte;
 	}
 
-	int nByte = sizeof(T) * num;		// 処理するバイト数
-	int nSentByte = 0;					// 送信されたデータサイズ
-
-	// unsigned char*に変換し、データを送信
-	nSentByte = send(m_sock, reinterpret_cast<const char *>(pData), nByte, 0);
-
-	// 送信成功
-	return nSentByte;
+	return nTotal;
 }
 
 //==================================================================================
 // --- データ送信処理 (サイズ自動送信) ---
 //==================================================================================
-template<class T> int CTcpClient::SendWithSize(const T *pData, const int num)
+template<class T> int CTcpClient::SendWithSize(const T *pData, const int nNum)
 {
-	int nByte = sizeof(T) * num;		// 処理するバイト数
+	const int nByte = static_cast<int>(sizeof(T)) * nNum;		// 処理するバイト数
 
 	// 送信するデータのバイト数を先に送信
-	Send(&nByte, 1);
+	const int nResult = Send(&nByte, 1);
+	if (CLIENT_TCP_FAILED(nResult)) return nResult;
 
 	// データを送信
-	return Send(pData, num);
+	return Send(pData, nNum);
 }
 
 //==================================================================================
 // --- データ受信処理 (エンディアン変換は外部で行う) ---
 //==================================================================================
-template<class T> int CTcpClient::Recv(T *pOut, const int num)
+template<class T> int CTcpClient::Recv(T *pOut, const int nNum)
 {
-	if (m_sock == INVALID_SOCKET)
-	{ // ソケットが無効なら失敗
-		return CLIENT_E_INVALID_SOCKET;
-	}
-	else if (pOut == NULL)
-	{ // データの書き出し先がNULLなら失敗
-		return CLIENT_E_INVALID_POINTER;
-	}
-	else if (num <= 0)
-	{ // 配列が0以下の場合失敗
-		return CLIENT_E_INVALID_ARG;
-	}
+	if (m_sock == INVALID_SOCKET) return CLIENT_E_INVALID_SOCKET;		// ソケットが無効
+	if (pOut == nullptr) return CLIENT_E_INVALID_POINTER;				// 書き出し先がNULL
+	if (nNum <= 0) return CLIENT_E_INVALID_ARG;							// 配列数が0以下
 
-	int nByte = sizeof(T) * num;		// 処理するバイト数
+	const int nByte = static_cast<int>(sizeof(T)) * nNum;		// 処理するバイト数
 
 	// データを受信する
-	int nRecvSize = recv(m_sock, reinterpret_cast<char *>(pOut), nByte, 0);
+	const int nRecvSize = recv(m_sock, reinterpret_cast<char *>(pOut), nByte, 0);
 	if (nRecvSize <= 0)
-	{ // 受信失敗時
-		// ソケットを閉じる
+	{ // 受信失敗時、ソケットを閉じる
 		CloseSocket();
-
-		// 失敗
 		return CLIENT_E_CONNECTION;
 	}
 
-	// サイズを返す
+	// 受信したサイズを返す
 	return nRecvSize;
 }
 
 //==================================================================================
-// --- データ受信処理 (エンディアン変換は外部で行う) ---
+// --- データ受信処理 (指定サイズを全て受信) ---
 //==================================================================================
-template<class T> int CTcpClient::RecvAll(T *pOut, const int num)
+template<class T> int CTcpClient::RecvAll(T *pOut, const int nNum)
 {
-	int nTotal = 0;			// 合計で受け取ったバイト数
-	int nByteSize = sizeof(T) * num;	// 受け取るデータのバイト数
-	char *pByte = reinterpret_cast<char *>(pOut);	// 受け取ったデータ
+	if (pOut == nullptr) return CLIENT_E_INVALID_POINTER;		// 書き出し先がNULL
+	if (nNum <= 0) return CLIENT_E_INVALID_ARG;					// 配列数が0以下
+
+	const int nByteSize = static_cast<int>(sizeof(T)) * nNum;	// 受け取るデータのバイト数
+	char *pByte = reinterpret_cast<char *>(pOut);				// 受け取ったデータ
+	int nTotal = 0;												// 合計で受け取ったバイト数
 
 	while (nTotal < nByteSize)
 	{ // 受け取ったバイト数が指定のバイト数未満の間受け取り続ける
-		int nRecvByte = Recv(&pByte[nTotal], nByteSize - nTotal);
+		const int nRecvByte = Recv(&pByte[nTotal], nByteSize - nTotal);
 		if (nRecvByte <= 0) return nRecvByte;		// 受信失敗
 
-		nTotal += nRecvByte;		// 受け取ったバイト数を加算
+		nTotal += nRecvByte;
 	}
 
 	return nTotal;
@@ -155,56 +149,15 @@ template<class T> int CTcpClient::RecvAll(T *pOut, const int num)
 
 //==================================================================================
 // --- データ受信処理 (時間指定) ---
+// lSeconds に RECV_INFINITY を指定すると無限待機
 //==================================================================================
-template<class T> int CTcpClient::Recv(T *pOut, const int num, const long nSeconds, const long nMill)
+template<class T> int CTcpClient::Recv(T *pOut, const int nNum, const long lSeconds, const long lUsec)
 {
-	if (m_sock == INVALID_SOCKET)
-	{ // ソケットが無効なら失敗
-		return CLIENT_E_INVALID_SOCKET;
-	}
-	else if (pOut == NULL)
-	{ // データの書き出し先がNULLなら失敗
-		return CLIENT_E_INVALID_POINTER;
-	}
-	else if (num <= 0)
-	{ // 配列が0以下の場合失敗
-		return CLIENT_E_INVALID_ARG;
-	}
+	if (m_sock == INVALID_SOCKET) return CLIENT_E_INVALID_SOCKET;		// ソケットが無効
 
-	// タイムアウト設定関連変数
-	timeval timeout;				// タイムアウト用変数
-	fd_set fd_Wait;					// ソケット登録用変数
-	timeval *pTimeout = nullptr;	// 条件分岐用ポインタ
-	timeout.tv_sec = nSeconds;		// タイムアウト時間を設定
-	timeout.tv_usec = nMill;		// ミリ秒
+	// 受信可能になるまで待機
+	if (WaitReadable(lSeconds, lUsec) == false) return CLIENT_E_RECV_TIMEOUT;
 
-	// ソケットとfd_set変数を紐づけ
-	FD_ZERO(&fd_Wait);
-	FD_SET(m_sock, &fd_Wait);
-
-	// 無限待機の場合、selectの第5引数をnullに指定する
-	pTimeout = (nSeconds == RECV_INFINITY) ? nullptr : &timeout;
-
-	// 現在ソケットから情報を受け取れるのかを確認
-	if (select(m_sock + 1, &fd_Wait, NULL, NULL, pTimeout) <= 0)
-	{
-		return CLIENT_E_RECV_TIMEOUT;
-	}
-
-	int nByte = sizeof(T) * num;		// 処理するバイト数
-
-	// データを受信する
-	int nRecvSize = recv(m_sock, reinterpret_cast<char *>(pOut), nByte, 0);
-	if (nRecvSize <= 0)
-	{ // 受信失敗時
-		// ソケットを閉じる
-		CloseSocket();
-
-		// 失敗
-		return CLIENT_E_CONNECTION;
-	}
-
-	// サイズを返す
-	return nRecvSize;
+	return Recv(pOut, nNum);
 }
 #endif

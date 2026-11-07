@@ -1,8 +1,8 @@
 //==================================================================================
-// 
+//
 // ランキングクラスのヘッダーファイル [ranking.h]
 // Author : TENMA SAITO
-// 
+//
 //==================================================================================
 #ifndef _RANKING_H_
 #define _RANKING_H_
@@ -10,131 +10,114 @@
 //**********************************************************************************
 // *** インクルードファイル ***
 //**********************************************************************************
-#include <memory>
 #include <array>
-#include <span>
+#include <string>
 #include <string_view>
 #include <algorithm>
+#include <functional>
+#include <mutex>
 #include "app/main.h"
 #include "utility/filestream.h"
 
 //**********************************************************************************
-// *** ランキングクラス ***
+// *** ランキングクラス (スレッドセーフ) ***
+// T			: スコアの型
+// MAX_NUM		: ランキングに残す数
+// IS_ASCENDING	: true なら小さい値ほど上位、false なら大きい値ほど上位
 //**********************************************************************************
-template<typename T, size_t maxNum, bool isGreater> class CRanking
+template<typename T, size_t MAX_NUM, bool IS_ASCENDING> class CRanking
 {
 public:
-	CRanking();
-	~CRanking();
+	static constexpr int RANK_OUT = -1;		// ランキング外だった場合の順位
+
+	CRanking() = default;
+	~CRanking() = default;
 
 	HRESULT Init(std::string_view path);
 	void Uninit(void) {}
 	int Set(const T &score);
-	std::span<const T> Get(void) const { return m_aScore; }
+	std::array<T, MAX_NUM> Get(void) const;
 
 private:
-	std::array<T, maxNum> m_aScore = {};			// ランキングのスコア
-	std::string m_sRankingPath;		// ランキングデータファイルのパス
+	bool Save(void) const;
+
+	std::array<T, MAX_NUM> m_aScore = {};		// ランキングのスコア
+	std::string m_sRankingPath;					// ランキングデータファイルのパス
+	mutable std::mutex m_mutex;					// スレッド間のデータ競合防止用mutex
 };
-
-//==================================================================================
-// --- コンストラクタ ---
-//==================================================================================
-template<typename T, size_t maxNum, bool isGreater> CRanking<T, maxNum, isGreater>::CRanking()
-{
-}
-
-//==================================================================================
-// --- デストラクタ ---
-//==================================================================================
-template<typename T, size_t maxNum, bool isGreater> CRanking<T, maxNum, isGreater>::~CRanking()
-{
-}
 
 //==================================================================================
 // --- 初期化処理 ---
 //==================================================================================
-template<typename T, size_t maxNum, bool isGreater> 
-HRESULT CRanking<T, maxNum, isGreater>::Init(std::string_view path)
-{ // バイナリファイルから現在のランキングのスコアを取得
-	std::unique_ptr<CFileStream> pFile(new CFileStream);		// ファイルストリームへのポインタ
-	if (pFile == nullptr) return E_FAIL;		// ファイルストリーム生成失敗
-
-	if (pFile->Open(path, true))
-	{ // オープン成功時, ランキングデータ読み込み
-		pFile->Read(&m_aScore[0], sizeof(T) * maxNum);
-
-		// ファイルを閉じる
-		pFile->Close();
-	}
-	else if (pFile->Create(path, true, CFileStream::FLAG_OVERWRITE))
-	{ // ファイルが存在せず、新規作成に成功した場合、初期値を書き出し
-		pFile->Write(&m_aScore[0], sizeof(T) * m_aScore.size());
-
-		// ファイルを閉じる
-		pFile->Close();
-	}
-	else
-	{ // 失敗
-		return E_FAIL;
-	}
-
+template<typename T, size_t MAX_NUM, bool IS_ASCENDING>
+HRESULT CRanking<T, MAX_NUM, IS_ASCENDING>::Init(std::string_view path)
+{
+	std::lock_guard<std::mutex> lock(m_mutex);
 	m_sRankingPath = path;		// ファイル名保存
-	return S_OK;
+
+	// バイナリファイルから現在のランキングのスコアを取得
+	CFileStream file;
+	if (file.Open(path, true))
+	{ // オープン成功時, ランキングデータ読み込み
+		file.Read(m_aScore.data(), sizeof(T) * m_aScore.size());
+		return S_OK;
+	}
+
+	// ファイルが存在しない場合、初期値を書き出す
+	return Save() ? S_OK : E_FAIL;
 }
 
 //==================================================================================
-// --- スコア追加関数 ---
+// --- スコア追加処理 (戻り値は順位、ランキング外なら RANK_OUT) ---
 //==================================================================================
-template<typename T, size_t maxNum, bool isGreater> int CRanking<T, maxNum, isGreater>::Set(const T &score)
+template<typename T, size_t MAX_NUM, bool IS_ASCENDING>
+int CRanking<T, MAX_NUM, IS_ASCENDING>::Set(const T &score)
 {
-	std::array<T, maxNum + 1> aRanking = {};		// ランキング計算用変数
+	std::lock_guard<std::mutex> lock(m_mutex);
 
-	// 現在のランキングの値をコピー
+	// 現在のランキングに引数のスコアを加えて並べ替え
+	std::array<T, MAX_NUM + 1> aRanking = {};
 	std::ranges::copy(m_aScore, aRanking.begin());
+	aRanking[MAX_NUM] = score;
 
-	// 引数のスコアを追加
-	aRanking[maxNum] = score;
-
-	// ランキングをソート
-	if constexpr (isGreater == true)
-	{ // 降順
+	if constexpr (IS_ASCENDING)
+	{ // 昇順 (小さい値ほど上位)
 		std::ranges::sort(aRanking);
 	}
 	else
-	{ // 昇順
+	{ // 降順 (大きい値ほど上位)
 		std::ranges::sort(aRanking, std::greater{});
 	}
 
-	// ソート後のランキングの値をコピー
-	std::copy(aRanking.begin(), aRanking.end() - 1, m_aScore.begin());
+	// 上位のみ残してファイルへ書き出し
+	std::copy(aRanking.begin(), aRanking.begin() + MAX_NUM, m_aScore.begin());
+	Save();
 
-	// ファイルへ書き出し
-	std::unique_ptr<CFileStream> pFile(new CFileStream);		// ファイルストリームへのポインタ
-	if (pFile != nullptr)
-	{ // 生成成功時
-		if (pFile->Create(m_sRankingPath, true, CFileStream::FLAG_OVERWRITE))
-		{ // ファイル作成成功時、ランキングデータを新規で書き出し
-			pFile->Write(&m_aScore[0], sizeof(T) * m_aScore.size());
+	// 順位を取得 (同点の場合は上位扱い)
+	const auto it = std::ranges::find(aRanking, score);
+	const int nRank = static_cast<int>(std::distance(aRanking.begin(), it)) + 1;
+	return (nRank > static_cast<int>(MAX_NUM)) ? RANK_OUT : nRank;
+}
 
-			// ファイルを閉じる
-			pFile->Close();
-		}
-	}
+//==================================================================================
+// --- ランキング取得処理 (コピーを返す) ---
+//==================================================================================
+template<typename T, size_t MAX_NUM, bool IS_ASCENDING>
+std::array<T, MAX_NUM> CRanking<T, MAX_NUM, IS_ASCENDING>::Get(void) const
+{
+	std::lock_guard<std::mutex> lock(m_mutex);
+	return m_aScore;
+}
 
-	// 順位を取得
-	int nRank = 1;
-	for (const auto &rRanking : aRanking)
-	{ // ランキングの合計数分回す
-		// 同じスコアだった場合ストップ
-		if (rRanking == score) break;
+//==================================================================================
+// --- ファイル書き出し処理 (呼び出し側でロックしておくこと) ---
+//==================================================================================
+template<typename T, size_t MAX_NUM, bool IS_ASCENDING>
+bool CRanking<T, MAX_NUM, IS_ASCENDING>::Save(void) const
+{
+	CFileStream file;
+	if (file.Create(m_sRankingPath, true, CFileStream::FLAG_OVERWRITE) == false) return false;
 
-		// 順位を増加
-		nRank++;
-	}
-	
-	// 範囲外の場合、-1
-	if (nRank > maxNum) nRank = -1;
-	return nRank;
+	return file.Write(m_aScore.data(), sizeof(T) * m_aScore.size());
 }
 #endif

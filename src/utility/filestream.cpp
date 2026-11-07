@@ -1,6 +1,6 @@
 //==================================================================================
 //
-// ファイル入出力クラスの作成！ [fliestream.cpp]
+// ファイル入出力クラスの作成！ [filestream.cpp]
 // Author : TENMA SAITO
 //
 //==================================================================================
@@ -13,23 +13,13 @@
 //==================================================================================
 // --- コンストラクタ ---
 //==================================================================================
-CFileStream::CFileStream() noexcept
-{ // メンバ変数をクリア
-	m_size = 0;
-	m_bBinary = false;
-	m_bInStream = false;
-}
+CFileStream::CFileStream() noexcept = default;
 
 //==================================================================================
 // --- ファイルオープンコンストラクタ ---
 //==================================================================================
 CFileStream::CFileStream(std::string_view sFilename, const bool bBinary)
-{ // メンバ変数をクリア
-	m_size = 0;
-	m_bBinary = false;
-	m_bInStream = false;
-
-	// ファイルオープン
+{ // ファイルオープン
 	Open(sFilename, bBinary);
 }
 
@@ -37,26 +27,8 @@ CFileStream::CFileStream(std::string_view sFilename, const bool bBinary)
 // --- ファイル作成コンストラクタ ---
 //==================================================================================
 CFileStream::CFileStream(std::string_view sFilename, const bool bBinary, const FLAG flag)
-{ // メンバ変数をクリア
-	m_size = 0;
-	m_bBinary = false;
-	m_bInStream = false;
-
-	// ファイル作成
+{ // ファイル作成
 	Create(sFilename, bBinary, flag);
-}
-
-//==================================================================================
-// --- ムーブコンストラクタ ---
-//==================================================================================
-CFileStream::CFileStream(CFileStream &&other) noexcept
-{ // メンバ変数をムーブ
-	this->m_bBinary = std::move(other.m_bBinary);
-	this->m_bInStream = std::move(other.m_bInStream);
-	this->m_filename = std::move(other.m_filename);
-	this->m_size = std::move(other.m_size);
-	this->m_Infile = std::move(other.m_Infile);
-	this->m_Outfile = std::move(other.m_Outfile);
 }
 
 //==================================================================================
@@ -172,6 +144,14 @@ bool CFileStream::Create(std::string_view sFilename, const bool bBinary, const F
 	{ // テキストファイルの作成
 		// バイナリフラグを下す
 		m_bBinary = false;
+	}
+
+	// 保存先のフォルダが無ければ作成
+	const std::filesystem::path path(sFilename);
+	if (path.has_parent_path())
+	{
+		std::error_code ec;
+		std::filesystem::create_directories(path.parent_path(), ec);
 	}
 
 	// ファイル作成
@@ -494,6 +474,7 @@ void CFileStream::ScanSizeInStream(void)
 	if (IsOpen() == false)
 	{ // ファイルが開かれていなければ、サイズをリセット
 		m_size = 0;
+		return;
 	}
 
 	// ファイルの現在位置を取得
@@ -510,27 +491,9 @@ void CFileStream::ScanSizeInStream(void)
 }
 
 //==================================================================================
-// --- 演算子のオーバーロード (ムーブ) ---
-//==================================================================================
-CFileStream &CFileStream::operator=(CFileStream &&other) noexcept
-{
-	if (this == &other) return *this;
-
-	// メンバ変数をムーブ
-	this->m_bBinary = std::move(other.m_bBinary);
-	this->m_bInStream = std::move(other.m_bInStream);
-	this->m_filename = std::move(other.m_filename);
-	this->m_size = std::move(other.m_size);
-	this->m_Infile = std::move(other.m_Infile);
-	this->m_Outfile = std::move(other.m_Outfile);
-
-	return *this;
-}
-
-//==================================================================================
 // --- 演算子のオーバーロード (bool値への変換) ---
 //==================================================================================
 CFileStream::operator bool(void) const
 {
-	return IsOpen() && IsEoF();
+	return IsOpen() && !IsEoF();
 }
