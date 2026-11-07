@@ -68,3 +68,7 @@ Testing/
 .cache/
 /Debug
 /Release
+
+# Visual Studio
+.vs/
+x64/
